@@ -57,7 +57,7 @@ env.colorize_errors = True
 env.abort_on_prompts = True
 env.connection_attempts = 3
 env.disable_known_hosts = True
-env.gateway = 'bast1001.wikimedia.org'
+env.gateway = 'bastion.wmflabs.org'
 env.key_filename = os.path.join(os.path.expanduser('~'), '.ssh/id_rsa')
 
 
