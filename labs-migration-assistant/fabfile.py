@@ -111,45 +111,47 @@ def parse_lab_instances(html_raw):
 	labinstances = {}
 	soup = BeautifulSoup(html_raw)
 	container = soup.find('div', {'id': 'mw-content-text'})
-	for tag in container.children:
-		if tag.name == 'h2':
-			project = tag.get('id')
-			logging.info('Found project: %s' % project)
-		elif tag.name == 'div':
-			dc = tag.find('h3').text.strip()
-			logging.info('Datacenter: %s' % dc)
-			table = tag.find('table')
-			'''
-			TODO: the last <tr> from the table is not found, probably me doing something dumb 
-			but that means that the final labs instance will not be analyzed :(
-			'''
-			cells = table.find('tr')
-			for cell in cells:
-				if 'novainstancename' in cell.attrs['class']:
-					logging.info('Instance: %s' % cell.text)
-					labinstance = LabInstance(cell.text, project, dc)
-					labinstances[str(labinstance)] = labinstance
+	if container:
+		for tag in container.children:
+			if tag.name == 'h2':
+				project = tag.get('id')
+				logging.info('Found project: %s' % project)
+			elif tag.name == 'div':
+				dc = tag.find('h3').text.strip()
+				logging.info('Datacenter: %s' % dc)
+				table = tag.find('table')
+				'''
+				TODO: the last <tr> from the table is not found, probably me doing something dumb 
+				but that means that the final labs instance will not be analyzed :(
+				'''
+				cells = table.find('tr')
+				for cell in cells:
+					if 'novainstancename' in cell.attrs['class']:
+						logging.info('Instance: %s' % cell.text)
+						labinstance = LabInstance(cell.text, project, dc)
+						labinstances[str(labinstance)] = labinstance
 	return labinstances
 
 def fetch_lab_instances():
 	get_token_url = 'https://wikitech.wikimedia.org/w/api.php?action=login&lgname=%s&lgpassword=%s&format=json' % (env.wiki_username, env.wiki_password)
 	url = 'https://wikitech.wikimedia.org/wiki/Special:NovaResources'
-	
-	request = ''
+	verify = False
+	result = ''
 	try:
 		session = requests.Session()
-		token_request = session.post(get_token_url)
+		token_request = session.post(get_token_url, verify=verify)
 		lgtoken = json.loads(token_request.text).get('login', {}).get('token')
 		sessionid = json.loads(token_request.text).get('login', {}).get('sessionid')
 		confirm_token_url = '%s&lgtoken=%s' % (get_token_url, lgtoken)
 		headers = {'sessionid' : sessionid}
-		confirm_request = session.post(confirm_token_url, headers=headers)
-		request = session.get(url)
+		confirm_request = session.post(confirm_token_url, headers=headers, verify=verify)
+		request = session.get(url, verify=verify)
+		result = request.text
 	except requests.exceptions.ConnectionError, e:
 		logging.error(e)
 	finally:
 		session.close()
-	return request.text
+	return result
 
 @task
 def detect_self_puppetmaster(labinstances):
