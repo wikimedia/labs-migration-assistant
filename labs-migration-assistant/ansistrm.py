@@ -4,7 +4,8 @@
 import ctypes
 import logging
 import os
- 
+
+
 class ColorizingStreamHandler(logging.StreamHandler):
     # color names to indices
     color_map = {
@@ -17,8 +18,8 @@ class ColorizingStreamHandler(logging.StreamHandler):
         'cyan': 6,
         'white': 7,
     }
- 
-    #levels to (background, foreground, bold/intense)
+
+    # levels to (background, foreground, bold/intense)
     if os.name == 'nt':
         level_map = {
             logging.DEBUG: (None, 'green', True),
@@ -37,12 +38,12 @@ class ColorizingStreamHandler(logging.StreamHandler):
         }
     csi = '\x1b['
     reset = '\x1b[0m'
- 
+
     @property
     def is_tty(self):
         isatty = getattr(self.stream, 'isatty', None)
         return isatty and isatty()
- 
+
     def emit(self, record):
         try:
             message = self.format(record)
@@ -57,14 +58,14 @@ class ColorizingStreamHandler(logging.StreamHandler):
             raise
         except:
             self.handleError(record)
- 
+
     if os.name != 'nt':
         def output_colorized(self, message):
             self.stream.write(message)
     else:
         import re
         ansi_esc = re.compile(r'\x1b\[((?:\d+)(?:;(?:\d+))*)m')
- 
+
         nt_color_map = {
             0: 0x00,    # black
             1: 0x04,    # red
@@ -75,7 +76,7 @@ class ColorizingStreamHandler(logging.StreamHandler):
             6: 0x03,    # cyan
             7: 0x07,    # white
         }
- 
+
         def output_colorized(self, message):
             parts = self.ansi_esc.split(message)
             write = self.stream.write
@@ -83,7 +84,7 @@ class ColorizingStreamHandler(logging.StreamHandler):
             fd = getattr(self.stream, 'fileno', None)
             if fd is not None:
                 fd = fd()
-                if fd in (1, 2): # stdout or stderr
+                if fd in (1, 2):  # stdout or stderr
                     h = ctypes.windll.kernel32.GetStdHandle(-10 - fd)
             while parts:
                 text = parts.pop(0)
@@ -100,13 +101,14 @@ class ColorizingStreamHandler(logging.StreamHandler):
                             elif 30 <= p <= 37:
                                 color |= self.nt_color_map[p - 30]
                             elif p == 1:
-                                color |= 0x08 # foreground intensity on
-                            elif p == 0: # reset to default color
+                                color |= 0x08  # foreground intensity on
+                            elif p == 0:  # reset to default color
                                 color = 0x07
                             else:
-                                pass # error condition ignored
-                        ctypes.windll.kernel32.SetConsoleTextAttribute(h, color)
- 
+                                pass  # error condition ignored
+                        ctypes.windll.kernel32.SetConsoleTextAttribute(
+                            h, color)
+
     def colorize(self, message, record):
         if record.levelno in self.level_map:
             bg, fg, bold = self.level_map[record.levelno]
@@ -121,7 +123,7 @@ class ColorizingStreamHandler(logging.StreamHandler):
                 message = ''.join((self.csi, ';'.join(params),
                                    'm', message, self.reset))
         return message
- 
+
     def format(self, record):
         message = logging.StreamHandler.format(self, record)
         if self.is_tty:
@@ -130,7 +132,8 @@ class ColorizingStreamHandler(logging.StreamHandler):
             parts[0] = self.colorize(parts[0], record)
             message = '\n'.join(parts)
         return message
- 
+
+
 def main():
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
@@ -140,6 +143,6 @@ def main():
     logging.warning('WARNING')
     logging.error('ERROR')
     logging.critical('CRITICAL')
- 
+
 if __name__ == '__main__':
     main()
