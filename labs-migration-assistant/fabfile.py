@@ -247,6 +247,10 @@ def migrate_ready():
 		labinstances = parse_lab_instances(html_raw)
 	hosts = ['%s.%s.wmflabs' % (labinstance.name, labinstance.datacenter) for labinstance in labinstances.values()]
 
+	if len(hosts) == 0:
+		logging.error('I was either not able to parse the Wikitech page containing your lab instances or you are not the administrator for any lab instance.')
+		exit(-1)
+
 	execute(detect_self_puppetmaster, hosts=hosts, labinstances=labinstances)
 	execute(detect_last_puppet_run, hosts=hosts, labinstances=labinstances)
 	execute(detect_shared_storage_for_projects, hosts=hosts, labinstances=labinstances)
@@ -271,6 +275,7 @@ def main():
 	print 'You should not run this script directly but instead call it as:'
 	print 'fab migrate_ready --set wiki_username=YOUR_WIKI_USERNAME,wiki_password=YOUR_WIKI_PASSWORD'
 	print
+	print 'The wiki that we are referring to is Wikitech.'
 	print 'You might need to pass additional paramaters like your password for your SSH key, but this'
 	print 'depends on the actual setup of your system.'
 	print 'For an overview of possible parameters run fab --help'
