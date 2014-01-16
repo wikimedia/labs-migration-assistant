@@ -162,10 +162,11 @@ def detect_self_puppetmaster(labinstances):
 		else:
 			logging.error('You are running your own self-hosted puppet master. [FAIL]')
 			labinstances[env.host_string].detect_self_puppetmaster = False
+			labinstances[env.host_string].connect = True
 	except SystemExit:
 		logging.error('Could not connect to %s.' % env.host_string)
 		labinstances[env.host_string].connect = False # we only to set this once if we cannot connect to the instance.
-	labinstances[env.host_string].connect = True
+	
 
 @task
 def detect_last_puppet_run(labinstances):
@@ -258,7 +259,7 @@ def migrate_ready():
 	
 	for labsinstance in labinstances.values():
 			if not labsinstance.connect:
-				logging.error('There were problems connecting to instance %s, fix those problems first and then rerun this script.' % labsinstance)
+				logging.error('There were problems connecting to instance %s, please fix those problems first and then rerun this script.' % labsinstance)
 			else:
 				logging.error('%s does not yet seem to be ready for migration to eqiad. Please fix the %d identified problems.' % (labsinstance, labsinstance.count_errors()))
 				logging.info('Summary of failed tasks:')
@@ -268,6 +269,9 @@ def migrate_ready():
 					if not result:
 						logging.info('Problem %d: task %s [FAIL]' % (problems, task))
 						problems +=1
+				if problems == 1:
+					logging.info('Congratulations! %s seems ready for migration!' % labinstance)
+
 
 run = logged(run)
 
