@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '''
 
 import os
-import json
 import logging
 import functools
 
@@ -32,7 +31,6 @@ import yaml
 import requests
 
 from fabric.api import *
-from bs4 import BeautifulSoup
 from datetime import datetime
 from ansistrm import ColorizingStreamHandler
 
@@ -56,6 +54,7 @@ env.colorize_errors = True
 env.abort_on_prompts = True
 env.connection_attempts = 3
 env.disable_known_hosts = True
+env.reject_unknown_hosts = False
 env.gateway = 'bastion.wmflabs.org'
 env.key_filename = os.path.join(os.path.expanduser('~'), '.ssh/id_rsa')
 
@@ -69,7 +68,6 @@ class LabInstance:
         self.project = project
         self.datacenter = datacenter
         self.connect = None
-        self.add_instance_to_fabric_env()
         for task in self.tasks:
             setattr(self, task, True)
 
@@ -78,9 +76,6 @@ class LabInstance:
 
     def __repr__(self):
         return str(self)
-
-    def add_instance_to_fabric_env(self):
-        env.hosts.append(str(self))
 
     def count_errors(self):
         return sum([1 for task in self.tasks if getattr(self, task) is False])
@@ -95,7 +90,7 @@ def check_connection(func, *args, **kwargs):
         output = func(*args, **kwargs)
         print output
     # if not labinstances[env.host_string].connect:
-        #	logging.info('Skipping task because during first task was not able to connect to labsinstance.')
+        #   logging.info('Skipping task because during first task was not able to connect to labsinstance.')
     return output
     return wrapper
 
@@ -111,55 +106,42 @@ def logged(func):
     return wrapper
 
 
-def parse_lab_instances(html_raw):
-    labinstances = {}
-    soup = BeautifulSoup(html_raw)
-    container = soup.find('div', {'id': 'mw-content-text'})
-    if container:
-        for tag in container.children:
-            if tag.name == 'h2':
-                project = tag.get('id')
-                logging.info('Found project: %s' % project)
-            elif tag.name == 'div':
-                dc = tag.find('h3').text.strip()
-                logging.info('Datacenter: %s' % dc)
-                table = tag.find('table')
-                '''
-                TODO: the last <tr> from the table is not found, probably me doing something dumb
-                but that means that the final labs instance will not be analyzed :(
-                '''
-                cells = table.find('tr')
-                for cell in cells:
-                    if 'novainstancename' in cell.attrs['class']:
-                        logging.info('Instance: %s' % cell.text)
-                        labinstance = LabInstance(cell.text, project, dc)
-                        labinstances[str(labinstance)] = labinstance
-    return labinstances
+def parse_lab_instances(labinstances):
+    results = {}
+    for group in labinstances:
+        for resource, labinstance in group.get('results', {}).iteritems():
+            names = labinstance.get('printouts', {}).get('Instance Name', None)
+            project = labinstance.get('printouts', {}).get('Project', None)
+            dc = resource.split('.')[1]
+            for name in names:
+                if not name.startswith('tools'):
+                    # ignore all tool-labs instances as they are managed by
+                    # WMF.
+                    labinstance = LabInstance(name, project, dc)
+                    results[str(labinstance)] = labinstance
+    return results
 
 
 def fetch_lab_instances():
-    get_token_url = 'https://wikitech.wikimedia.org/w/api.php?action=login&lgname=%s&lgpassword=%s&format=json' % (
-        env.wiki_username, env.wiki_password)
-    url = 'https://wikitech.wikimedia.org/wiki/Special:NovaResources'
+    projects_url = 'https://wikitech.wikimedia.org/w/api.php?action=ask&query=[[Member::User:%s]]&format=json' % env.wiki_username
     verify = False
-    result = ''
+    labinstances = []
     try:
-        session = requests.Session()
-        token_request = session.post(get_token_url, verify=verify)
-        lgtoken = json.loads(token_request.text).get('login', {}).get('token')
-        sessionid = json.loads(token_request.text).get(
-            'login', {}).get('sessionid')
-        confirm_token_url = '%s&lgtoken=%s' % (get_token_url, lgtoken)
-        headers = {'sessionid': sessionid}
-        confirm_request = session.post(
-            confirm_token_url, headers=headers, verify=verify)
-        request = session.get(url, verify=verify)
-        result = request.text
+        request = requests.get(projects_url, verify=verify)
+        projects = request.json().get('query', {}).get('results', {})
+        for project in projects:
+            project = project.split(':')[1].lower()
+            instances_url = 'https://wikitech.wikimedia.org/w/api.php?action=ask&query=[[Resource Type::instance]][[Project::%s]]|?Instance Name|?Project&format=json' % project
+            request = requests.get(instances_url, verify=verify)
+            labinstances.append(request.json().get('query', {}))
     except requests.exceptions.ConnectionError, e:
         logging.error(e)
+    except Exception, e:
+        logging.error('Caught unexpected error')
+        logging.error(e)
     finally:
-        session.close()
-    return result
+        pass
+    return labinstances
 
 
 @task
@@ -167,7 +149,7 @@ def detect_self_puppetmaster(labinstances):
     try:
         result = run(
             'grep "^server = virt0.wikimedia.org" /etc/puppet/puppet.conf | wc -l')
-        if result == 0:
+        if result == '0':
             logging.info('You are not using a self-hosted puppet master. [OK]')
         else:
             logging.error(
@@ -270,8 +252,8 @@ def migrate_ready():
         test_instance = LabInstance('limn0', 'analytics', 'pmtpa')
         labinstances = {'limn0.pmtpa.wmflabs': test_instance}
     else:
-        html_raw = fetch_lab_instances()
-        labinstances = parse_lab_instances(html_raw)
+        labinstances = fetch_lab_instances()
+        labinstances = parse_lab_instances(labinstances)
     hosts = ['%s.%s.wmflabs' % (labinstance.name, labinstance.datacenter)
              for labinstance in labinstances.values()]
 
@@ -280,12 +262,14 @@ def migrate_ready():
             'I was either not able to parse the Wikitech page containing your lab instances or you are not the administrator for any lab instance.')
         exit(-1)
 
-    execute(detect_self_puppetmaster, hosts=hosts, labinstances=labinstances)
-    execute(detect_last_puppet_run, hosts=hosts, labinstances=labinstances)
-    execute(detect_shared_storage_for_projects,
-            hosts=hosts, labinstances=labinstances)
-    execute(detect_shared_storage_for_home,
-            hosts=hosts, labinstances=labinstances)
+    with settings(warn_only=True):
+        execute(detect_self_puppetmaster, hosts=hosts,
+                labinstances=labinstances)
+        execute(detect_last_puppet_run, hosts=hosts, labinstances=labinstances)
+        execute(detect_shared_storage_for_projects,
+                hosts=hosts, labinstances=labinstances)
+        execute(detect_shared_storage_for_home,
+                hosts=hosts, labinstances=labinstances)
 
     for labsinstance in labinstances.values():
         if not labsinstance.connect:

@@ -1,5 +1,4 @@
 fabric>=1.8.1
 requests>=2.2.0
 PyYAML==3.10
-BeautifulSoup4>=4.3.2
 
