@@ -298,7 +298,7 @@ run = logged(run)
 
 def main():
     print 'You should not run this script directly but instead call it as:'
-    print 'fab migrate_ready --set wiki_username=YOUR_WIKI_USERNAME,wiki_password=YOUR_WIKI_PASSWORD'
+    print 'fab migrate_ready --set wiki_username=YOUR_WIKI_USERNAME'
     print
     print 'The wiki that we are referring to is Wikitech.'
     print 'You might need to pass additional paramaters like your password for your SSH key, but this'

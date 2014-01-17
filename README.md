@@ -21,8 +21,8 @@ The command to run the script is easy:
 
 ``` shell
 cd labs-migration-assistant
-fab migrate_ready --set wiki_username=YOUR_WIKI_USERNAME,wiki_password=YOUR_WIKI_PASSWORD
-# use your credentials for Wikitech
+fab migrate_ready --set wiki_username=YOUR_WIKI_USERNAME
+# use your username for Wikitech
 ```
 
 ## Requirements
