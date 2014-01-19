@@ -21,7 +21,7 @@ The command to run the script is easy:
 
 ``` shell
 cd labs-migration-assistant
-fab migrate_ready --set wiki_username=YOUR_WIKI_USERNAME
+fab test --set wiki_username=YOUR_WIKI_USERNAME
 # use your username for Wikitech
 ```
 
@@ -31,7 +31,18 @@ Development of this script was done using Python 2.7.5 on OSX 10.9. I expect tha
 on Python 2.5 and 2.6 as well and I do not foresee problems with Linux either. But....bug reports are
 always welcome and pull requests even more!
 
-Use a recent version of pip.
+Use a recent version of pip (1.2 or higher)
+
+## Troubleshooting
+
+Sometimes a lab instance might be totally unresponsive and SSH will not time-out. If that happens then
+abort the script using CTRL+Z or CTRL+C and then invoke the labs migration assistant as follows
+
+``` shell
+fab test --set wiki_username=YOUR_WIKI_USERNAME --exclude_hosts=host1,host2
+```
+You should only use the name of the instance, not the FQDN.
+
 ## Contributing
 
 1. Fork it
