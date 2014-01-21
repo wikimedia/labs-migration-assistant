@@ -57,6 +57,8 @@ env.connection_attempts = 3
 env.disable_known_hosts = True
 env.reject_unknown_hosts = False
 env.gateway = 'bastion.wmflabs.org'
+if not 'ignored_hosts' in env:
+    env.ignored_hosts = ''
 env.ignored_hosts = env.ignored_hosts.split(';')
 env.key_filename = os.path.join(os.path.expanduser('~'), '.ssh/id_rsa')
 
