@@ -68,7 +68,7 @@ class LabInstance:
     def __init__(self, name, project, datacenter):
         self.tasks = ['detect_self_puppetmaster', 'detect_last_puppet_run',
                       'detect_shared_storage_for_projects', 'detect_shared_storage_for_home',
-                      'detect_databases', 'detect_mediawiki']
+                      'detect_databases', 'detect_mediawiki', 'check_ubuntu']
         self.name = name
         self.project = project
         self.datacenter = datacenter
@@ -347,6 +347,25 @@ def detect_mediawiki():
 
 @task
 @check_connection
+def check_ubuntu():
+    min_ubuntu_version = 11.04
+    result = run('lsb_release -a')
+    version = run('lsb_release -r -s')
+    try:
+        version = float(version)
+        if min_ubuntu_version > version:
+            logging.warning('You are running an outdated version of Ubuntu, please upgrade. [WARNING]')
+            env.labinstances[env.host_string].check_ubuntu = 'WARNING'
+        else:
+            logging.info('You are running an up-to-date version of Ubuntu. [OK]')
+            env.labinstances[env.host_string].check_ubuntu = 'OK'
+    except ValueError:
+        logging.warning('Was not able to determine whether your Ubuntu installation is up to date. [WARNING')
+        env.labinstances[env.host_string].check_ubuntu = 'WARNING'
+
+
+@task
+@check_connection
 def test():
     with settings(warn_only=True):
         execute(detect_databases)
@@ -355,6 +374,7 @@ def test():
         execute(detect_last_puppet_run)
         execute(detect_shared_storage_for_projects)
         execute(detect_shared_storage_for_home)
+        execute(check_ubuntu)
     output_summary()
     '''
     TODO: There is a weird bug in probably my code where if you call test then it will keep looping over all
