@@ -30,7 +30,7 @@ import functools
 import yaml
 import requests
 
-from fabric.api import *
+from fabric.api import *  # noqa
 from datetime import datetime
 from ansistrm import ColorizingStreamHandler
 
@@ -57,7 +57,7 @@ env.connection_attempts = 3
 env.disable_known_hosts = True
 env.reject_unknown_hosts = False
 env.gateway = 'bastion.wmflabs.org'
-if not 'ignored_hosts' in env:
+if 'ignored_hosts' not in env:
     env.ignored_hosts = ''
 env.ignored_hosts = env.ignored_hosts.split(';')
 env.key_filename = os.path.join(os.path.expanduser('~'), '.ssh/id_rsa')
@@ -115,7 +115,7 @@ def parse_lab_instances(labinstances):
             # TODO: only analyse instances in Tampa, make this configurable?
             if dc == 'pmtpa':
                 for name in names:
-                    if not name.startswith('tools') and not name.startswith('bastion') and not name in env.ignored_hosts:
+                    if not name.startswith('tools') and not name.startswith('bastion') and name not in env.ignored_hosts:
                         # ignore all tool-labs instances as they are managed by
                         # WMF.
                         labinstance = LabInstance(name, project, dc)
@@ -349,7 +349,6 @@ def detect_mediawiki():
 @check_connection
 def check_ubuntu():
     min_ubuntu_version = 11.04
-    result = run('lsb_release -a')
     version = run('lsb_release -r -s')
     try:
         version = float(version)
